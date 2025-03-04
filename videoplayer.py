@@ -22,14 +22,14 @@ from PyQt5.QtWidgets import (
 
 
 class Gui:
-    def __init__(self, path: str) -> None:
+    def __init__(self, path: str, seconds: int) -> None:
         self.q_app = QApplication([])
         self.q_app.setStyle("Fusion")
         screen = QGuiApplication.screens()[0]
         availableGeometry = screen.availableGeometry()
         self.primary_width = availableGeometry.width()
         self.primary_height = availableGeometry.height() - 30
-        self.gui_window = GuiWindow(self, path)
+        self.gui_window = GuiWindow(self, path, seconds)
 
     def exit_app(self) -> None:
         self.q_app.quit()
@@ -37,7 +37,7 @@ class Gui:
 
 
 class GuiWindow(QWidget):
-    def __init__(self, gui: Gui, path: str) -> None:
+    def __init__(self, gui: Gui, path: str, seconds: int) -> None:
         super().__init__()
         self.gui = gui
         self.window_width: int = gui.primary_width
@@ -48,7 +48,7 @@ class GuiWindow(QWidget):
         self.layout: Layout = VideoLayout(self, 50, 212)
         self.setLayout(self.layout)
         self.show()
-        self.layout.start_video(path)
+        self.layout.start_video(path, seconds)
 
 
 class Label(QLabel):
@@ -255,12 +255,18 @@ class VideoLayout(Layout):
             "Skip backward 5 minutes",
         )
 
-    def start_video(self, path: str) -> None:
+    def start_video(self, path: str, seconds: int) -> None:
         try:
             self.cap = cv2.VideoCapture(path)
             self.fps = int(self.cap.get(cv2.CAP_PROP_FPS))
             self.total_frames = self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
             self.millisecs = int(1000.0 / self.fps / self.speed)
+
+            if seconds > 0:
+                frames_to_skip = int(self.fps * seconds)
+                new_frame_position = min(frames_to_skip, self.total_frames - 60)
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame_position)
+
             self.timer = QTimer()
             self.timer.setTimerType(Qt.PreciseTimer)
             self.timer.timeout.connect(self.next_frame_slot)
@@ -291,7 +297,7 @@ class VideoLayout(Layout):
     def half_speed(self) -> None:
         try:
             if self.speed > 0.06:
-                self.speed /= 2
+                self.speed / 2
             self.millisecs = int(1000.0 / self.fps / self.speed)
             self.speed_text = "Speed: x" + str(self.speed)
             self.timer.setInterval(self.millisecs)
@@ -402,5 +408,5 @@ try:
 except Exception:
     raise Exception("Please provide a video file path")
 
-gui = Gui(path)
+gui = Gui(path, 0)
 gui.q_app.exec()
